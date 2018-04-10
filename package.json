@@ -324,6 +324,12 @@
 			"SLDS-component-path": "/components/forms/#flavor-checkbox"
 		},
 		{
+			"component": "color-picker",
+			"status": "prod",
+			"display-name": "Color Pickers",
+			"SLDS-component-path": "/components/color-picker"
+		},
+		{
 			"component": "combobox",
 			"status": "prod",
 			"display-name": "Comboboxes",
