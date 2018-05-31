@@ -53,6 +53,10 @@ const propTypes = {
 	 */
 	disabled: PropTypes.bool,
 	/**
+	 * Prevents the dropdown from changing position based on the viewport/window. If set to true your dropdowns can extend outside the viewport _and_ overflow outside of a scrolling parent. If this happens, you might want to consider making the dropdowns contents scrollable to fit the menu on the screen. `hasStaticAlignment` disables this behavior and allows this component to extend beyond boundary elements. _Not tested._
+	 */
+	hasStaticAlignment: PropTypes.bool,
+	/**
 	 * Unique ID for component
 	 */
 	id: PropTypes.string,
@@ -90,11 +94,38 @@ const propTypes = {
 		submitButton: PropTypes.string,
 	}),
 	/**
+	 * Please select one of the following:
+	 * * `absolute` - (default) The dialog will use `position: absolute` and style attributes to position itself. This allows inverted placement or flipping of the dialog.
+	 * * `overflowBoundaryElement` - The dialog will overflow scrolling parents. Use on elements that are aligned to the left or right of their target and don't care about the target being within a scrolling parent. Typically this is a popover or tooltip. Dropdown menus can usually open up and down if no room exists. In order to achieve this a portal element will be created and attached to `body`. This element will render into that detached render tree.
+	 * * `relative` - No styling or portals will be used. Menus will be positioned relative to their triggers. This is a great choice for HTML snapshot testing.
+	 */
+	menuPosition: PropTypes.oneOf([
+		'absolute',
+		'overflowBoundaryElement',
+		'relative',
+	]),
+	/**
 	 * Triggered when the olor changes. It receives and event object that
 	 * originally triggered the change, as well as an object in the shape `{
 	 * color: [string] }`, which is a hex representation of the color.
 	 */
 	onChange: PropTypes.func,
+	/**
+	 * Function called when the dialog is closed.
+	 */
+	onClose: PropTypes.func,
+	/**
+	 * Function called when the dialog is opened.
+	 */
+	onOpen: PropTypes.func,
+	/**
+	 * Function called when the dialog would like to close.
+	 */
+	onRequestClose: PropTypes.func,
+	/**
+	 * Function called when the dialog would like to show.
+	 */
+	onRequestOpen: PropTypes.func,
 	/**
 	 * An array of hex color values which is used to set the options of the
 	 * swatch tab of the colorpicker popover.
@@ -126,6 +157,7 @@ const defaultProps = {
 		submitButton: 'Done',
 		swatchTab: 'Default',
 	},
+	menuPosition: 'absolute',
 	swatchColors: [
 		'#e3abec',
 		'#c2dbf7',
@@ -169,7 +201,7 @@ class ColorPicker extends React.Component {
 
 		this.generatedId = this.props.id || shortid.generate();
 
-		this.handleCancelButtonClick = this.handleCancelButtonClick.bind(this);
+		this.handleRequestClose = this.handleRequestClose.bind(this);
 		this.handleHexInputChange = this.handleHexInputChange.bind(this);
 		this.handleSaturationValueChange = this.handleSaturationValueChange.bind(
 			this
@@ -218,8 +250,11 @@ class ColorPicker extends React.Component {
 					'slds-color-picker__selector slds-popover',
 					this.props.classNameMenu
 				)}
-				position="absolute"
+				hasStaticAlignment={this.props.hasStaticAlignment}
+				onClose={this.props.onClose}
+				onOpen={this.props.onOpen}
 				onRequestTargetElement={() => this.wrapper}
+				position={this.props.menuPosition}
 			>
 				<div className="slds-popover__body">
 					<Tabs>
@@ -253,7 +288,7 @@ class ColorPicker extends React.Component {
 						<Button
 							className="slds-color-picker__selector-cancel"
 							label={this.props.labels.cancelButton}
-							onClick={this.handleCancelButtonClick}
+							onClick={this.handleRequestClose}
 							variant="neutral"
 						/>
 						<Button
@@ -277,12 +312,6 @@ class ColorPicker extends React.Component {
 		if (this.props.onWorkingColorChange) {
 			this.props.onWorkingColorChange(event, { color: newColor });
 		}
-	}
-
-	handleCancelButtonClick () {
-		this.setState({
-			isOpen: false,
-		});
 	}
 
 	handleColorChange (property) {
@@ -326,6 +355,26 @@ class ColorPicker extends React.Component {
 		};
 	}
 
+	handleRequestClose () {
+		if (this.props.onRequestClose) {
+			this.props.onRequestClose();
+		} else {
+			this.setState({
+				isOpen: false,
+			});
+		}
+	}
+
+	handleRequestOpen () {
+		if (this.props.onRequestOpen) {
+			this.props.onRequestOpen();
+		} else {
+			this.setState({
+				isOpen: true
+			});
+		}
+	}
+
 	handleSaturationValueChange (event, { saturation, value }) {
 		this.setWorkingColor(event, {
 			saturation,
@@ -335,10 +384,17 @@ class ColorPicker extends React.Component {
 
 	handleSubmitButtonClick (event) {
 		this.setState({
-			isOpen: false,
 			currentColor: this.state.workingColor.hex,
 			colorErrorMessage: '',
 		});
+
+		if (this.props.onRequestClose) {
+			this.props.onRequestClose();
+		} else {
+			this.setState({
+				isOpen: false
+			});
+		}
 
 		if (this.props.onChange) {
 			this.props.onChange(event, {
@@ -348,9 +404,11 @@ class ColorPicker extends React.Component {
 	}
 
 	handleSwatchButtonClick () {
-		this.setState({
-			isOpen: !this.state.isOpen,
-		});
+		if (!this.state.isOpen && this.props.onRequestOpen) {
+			this.handleRequestOpen();
+		} else if (this.state.isOpen) {
+			this.handleRequestClose();
+		}
 	}
 
 	handleSwatchSelect (event, { hex }) {
